@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V34</title>
+<title>Painel de Ordens de Produção - V35</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -179,7 +179,7 @@ body.smartphone .footer{flex-direction:column}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V34 • Ícones de setores refinados</span>
+        <span>V35 • Filtros cruzados • Geleia diferenciada</span>
       </div>
     </main>
   </div>
@@ -240,18 +240,25 @@ function statusList(){
   found.filter(s=>!ordered.includes(s)).sort((a,b)=>a.localeCompare(b,"pt-BR")).forEach(s=>ordered.push(s));
   return ordered;
 }
-function nonStatusFiltered(){
+function searchMatches(r){
   const q=clean(document.getElementById("search").value).toUpperCase();
+  return !q||(`${r.op} ${r.codigo} ${r.descricao} ${r.obs} ${r.setor} ${r.supervisor} ${r.status}`).toUpperCase().includes(q);
+}
+
+function filterContext({ignoreStatus=false,ignoreSector=false,ignoreSupervisor=false}={}){
   return data.filter(r=>{
-    const supOk=!selectedSupervisors.size||selectedSupervisors.has(r.supervisor);
-    const secOk=!selectedSectors.size||selectedSectors.has(r.setor);
-    const qOk=!q||(`${r.op} ${r.codigo} ${r.descricao} ${r.obs} ${r.setor} ${r.supervisor}`).toUpperCase().includes(q);
-    return supOk&&secOk&&qOk;
+    const statusOk=ignoreStatus||!selectedStatuses.size||selectedStatuses.has(r.status);
+    const sectorOk=ignoreSector||!selectedSectors.size||selectedSectors.has(r.setor);
+    const supervisorOk=ignoreSupervisor||!selectedSupervisors.size||selectedSupervisors.has(r.supervisor);
+    return statusOk&&sectorOk&&supervisorOk&&searchMatches(r);
   });
 }
+
+function nonStatusFiltered(){
+  return filterContext({ignoreStatus:true});
+}
 function tableFiltered(){
-  return nonStatusFiltered()
-    .filter(r=>!selectedStatuses.size||selectedStatuses.has(r.status))
+  return filterContext()
     .sort((a,b)=>dateKey(a.dataInicio)-dateKey(b.dataInicio)||Number(a.op||0)-Number(b.op||0));
 }
 function renderKpis(){
@@ -313,7 +320,12 @@ function toggleMultiStatus(){
 }
 
 function renderSupervisors(){
-  const names=[...new Set(data.map(r=>r.supervisor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const base=filterContext({ignoreSupervisor:true});
+  const names=[...new Set(base.map(r=>r.supervisor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+
+  // Remove seleções que deixaram de existir no contexto atual
+  [...selectedSupervisors].forEach(n=>{if(!names.includes(n))selectedSupervisors.delete(n);});
+
   const el=document.getElementById("supervisors");
   el.innerHTML=
     `<span class="section-label">Supervisores</span>`+
@@ -354,7 +366,18 @@ function sectorImageSvg(setor){
       <path d="M18 25h12v9H18z" fill="#fff7c7"/><circle cx="25" cy="29" r="2.7" fill="#587a2d"/>
     </svg>`;
   }
-  if(s.includes("CEREJA") || s.includes("GELEIA")){
+  if(s.includes("GELEIA")){
+    return `<svg viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="10" fill="#fff3f3"/>
+      <rect x="15" y="8" width="18" height="5" rx="2" fill="#8b2d22"/>
+      <path d="M14 13h20l-2 26c0 2-2 4-4 4h-8c-2 0-4-2-4-4z" fill="#d94a4a" stroke="#8b2d22" stroke-width="1.6"/>
+      <rect x="17" y="21" width="14" height="11" rx="2" fill="#fff4e8"/>
+      <path d="M20 28c2-5 7-5 9 0-3 3-6 3-9 0z" fill="#d9343a"/>
+      <path d="M24 23c1-2 2-3 4-4" stroke="#3f7d3e" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="27" cy="26" r="1.2" fill="#ffcf6a"/>
+    </svg>`;
+  }
+  if(s.includes("CEREJA")){
     return `<svg viewBox="0 0 48 48" aria-hidden="true">
       <rect width="48" height="48" rx="10" fill="#fff1f1"/>
       <path d="M24 21c1-8 5-11 10-13" fill="none" stroke="#397a3a" stroke-width="2.4" stroke-linecap="round"/>
@@ -443,12 +466,16 @@ function sectorImageSvg(setor){
 }
 
 function renderSectors(){
-  const base=data.filter(r=>!selectedSupervisors.size||selectedSupervisors.has(r.supervisor));
+  const base=filterContext({ignoreSector:true});
   const counts={};
   base.forEach(r=>{if(r.setor)counts[r.setor]=(counts[r.setor]||0)+1;});
   const sectors=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0],"pt-BR"));
-  const el=document.getElementById("sectorList");
+  const available=new Set(sectors.map(([s])=>s));
 
+  // Se o status/supervisor/busca mudou e o setor selecionado não existe mais, remove-o.
+  [...selectedSectors].forEach(s=>{if(!available.has(s))selectedSectors.delete(s);});
+
+  const el=document.getElementById("sectorList");
   el.innerHTML=sectors.map(([s,n])=>`
     <div class="sector ${selectedSectors.has(s)?"active":""}" data-sector="${encodeURIComponent(s)}">
       <div class="sector-thumb">${sectorImageSvg(s)}</div>
@@ -502,7 +529,12 @@ function renderTable(){
   </tr>`).join("");
   document.getElementById("recordInfo").textContent=`Mostrando ${rows.length.toLocaleString("pt-BR")} de ${data.length.toLocaleString("pt-BR")} ordens`;
 }
-function renderAll(){renderKpis();renderSupervisors();renderSectors();renderTable();}
+function renderAll(){
+  renderSupervisors();
+  renderSectors();
+  renderKpis();
+  renderTable();
+}
 
 function setData(arr,source){
   data=(Array.isArray(arr)?arr:[]).map(normalizeRecord).filter(r=>r.op||r.codigo||r.descricao);
