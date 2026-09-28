@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V37</title>
+<title>Painel de Ordens de Produção - V38</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -65,7 +65,7 @@ h1{font-size:22px;margin:0;color:var(--verde);letter-spacing:-.4px}
 .table-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .search{width:290px;max-width:42vw;border:1px solid var(--linha);border-radius:9px;padding:8px 10px;outline:none;font-size:12px;margin-left:auto}
 .table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid #e7ece8;border-radius:11px;scrollbar-width:thin}
-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1420px;font-size:12.5px}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1510px;font-size:12.5px}
 th{position:sticky;top:0;z-index:4;background:#f3f7f3;color:#34463a;text-transform:uppercase;font-size:10.5px;letter-spacing:.2px;text-align:left;padding:9px;border-bottom:1px solid var(--linha)}
 td{padding:8px 9px;border-bottom:1px solid #edf1ed;vertical-align:top;white-space:nowrap}
 td.desc{white-space:normal;min-width:245px;max-width:330px}
@@ -171,7 +171,7 @@ body.smartphone .footer{flex-direction:column}
         <table>
           <thead><tr>
             <th>NR OP</th><th>Código</th><th>Descrição</th><th>UND</th><th>Qtd Prog</th>
-            <th>Dt Início</th><th>Dt Fim</th><th>Qtd Final</th><th>Setor</th><th>Status</th>
+            <th>Dt Ordem</th><th>Dt Início</th><th>Dt Fim</th><th>Qtd Final</th><th>Setor</th><th>Status</th>
             <th>Supervisor</th><th>Observações</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
@@ -180,7 +180,7 @@ body.smartphone .footer{flex-direction:column}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V37 • Atualização automática 5 min</span>
+        <span>V38 • DT Ordem • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -218,6 +218,7 @@ function normalizeRecord(r){
     descricao:clean(r.descricao||pick(r,["DESCRIÇÃO","DESCRICAO"])),
     und:clean(r.und||pick(r,["UND","UN","UM"])),
     qtdPrev:clean(r.qtdPrev||pick(r,["QTD PROG","QTD PROGRAMADA","QNTD PREV."])),
+    dataOrdem:clean(r.dataOrdem||pick(r,["DT ORDEM","DATA ORDEM","DT. ORDEM","DATA DA ORDEM"])),
     dataInicio:clean(r.dataInicio||pick(r,["DT INICIO","DT INÍCIO","DATA INICIO PREV"])),
     dataFim:clean(r.dataFim||pick(r,["DT FIM","DATA FIM PREV"])),
     qtdFinal:clean(r.qtdFinal||pick(r,["QTD PROD","QTD FINAL","QNTD FINAL"])),
@@ -243,7 +244,7 @@ function statusList(){
 }
 function searchMatches(r){
   const q=clean(document.getElementById("search").value).toUpperCase();
-  return !q||(`${r.op} ${r.codigo} ${r.descricao} ${r.obs} ${r.setor} ${r.supervisor} ${r.status}`).toUpperCase().includes(q);
+  return !q||(`${r.op} ${r.codigo} ${r.descricao} ${r.dataOrdem} ${r.dataInicio} ${r.dataFim} ${r.obs} ${r.setor} ${r.supervisor} ${r.status}`).toUpperCase().includes(q);
 }
 
 function filterContext({ignoreStatus=false,ignoreSector=false,ignoreSupervisor=false}={}){
@@ -520,6 +521,7 @@ function renderTable(){
     <td class="desc" data-label="Descrição">${r.descricao}</td>
     <td data-label="UND">${r.und}</td>
     <td data-label="Qtd Prog">${r.qtdPrev}</td>
+    <td data-label="Dt Ordem">${r.dataOrdem}</td>
     <td data-label="Dt Início">${r.dataInicio}</td>
     <td data-label="Dt Fim">${r.dataFim}</td>
     <td class="qtd-final" data-label="Qtd Final">${r.qtdFinal}</td>
