@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V38</title>
+<title>Painel de Ordens de Produção - V40</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -65,11 +65,13 @@ h1{font-size:22px;margin:0;color:var(--verde);letter-spacing:-.4px}
 .table-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .search{width:290px;max-width:42vw;border:1px solid var(--linha);border-radius:9px;padding:8px 10px;outline:none;font-size:12px;margin-left:auto}
 .table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid #e7ece8;border-radius:11px;scrollbar-width:thin}
-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1510px;font-size:12.5px}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1565px;font-size:12.5px}
 th{position:sticky;top:0;z-index:4;background:#f3f7f3;color:#34463a;text-transform:uppercase;font-size:10.5px;letter-spacing:.2px;text-align:left;padding:9px;border-bottom:1px solid var(--linha)}
 td{padding:8px 9px;border-bottom:1px solid #edf1ed;vertical-align:top;white-space:nowrap}
 td.desc{white-space:normal;min-width:245px;max-width:330px}
 td.obs{white-space:normal;min-width:360px;max-width:560px;line-height:1.4;overflow-wrap:anywhere;font-size:12.5px}
+.dias-aberto-head{width:54px;min-width:54px;max-width:54px;text-align:center;white-space:normal;line-height:1.05}
+td.dias-aberto{width:54px;min-width:54px;max-width:54px;text-align:center;font-weight:900;white-space:normal}
 td.qtd-final{color:var(--azul);font-weight:950}
 .tag{display:inline-block;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:900;white-space:nowrap}
 .tag-finalizada{background:#e7f0ff;color:#0758b8}
@@ -171,7 +173,7 @@ body.smartphone .footer{flex-direction:column}
         <table>
           <thead><tr>
             <th>NR OP</th><th>Código</th><th>Descrição</th><th>UND</th><th>Qtd Prog</th>
-            <th>Dt Ordem</th><th>Dt Início</th><th>Dt Fim</th><th>Qtd Final</th><th>Setor</th><th>Status</th>
+            <th>Dt Ordem</th><th>Dt Início</th><th>Dt Fim</th><th class="dias-aberto-head">DIAS<br>EM<br>ABERTO</th><th>Qtd Final</th><th>Setor</th><th>Status</th>
             <th>Supervisor</th><th>Observações</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
@@ -180,7 +182,7 @@ body.smartphone .footer{flex-direction:column}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V38 • DT Ordem • Atualização automática 5 min</span>
+        <span>V40 • Dias em aberto • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -207,8 +209,21 @@ function clean(v){
   const invalid=["","0,00","#N/D","#N/A","#REF!","#VALOR!","#VALUE!","UNDEFINED","NULL"];
   return invalid.includes(s.toUpperCase()) ? "" : s;
 }
+function headerKey(v){
+  return String(v ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .toUpperCase()
+    .replace(/[._-]+/g," ")
+    .replace(/\s+/g," ");
+}
 function pick(o,names){
-  for(const n of names) if(o && Object.prototype.hasOwnProperty.call(o,n) && clean(o[n])) return clean(o[n]);
+  if(!o) return "";
+  const wanted = new Set(names.map(headerKey));
+  for(const [key,value] of Object.entries(o)){
+    if(wanted.has(headerKey(key)) && clean(value)) return clean(value);
+  }
   return "";
 }
 function normalizeRecord(r){
@@ -218,7 +233,11 @@ function normalizeRecord(r){
     descricao:clean(r.descricao||pick(r,["DESCRIÇÃO","DESCRICAO"])),
     und:clean(r.und||pick(r,["UND","UN","UM"])),
     qtdPrev:clean(r.qtdPrev||pick(r,["QTD PROG","QTD PROGRAMADA","QNTD PREV."])),
-    dataOrdem:clean(r.dataOrdem||pick(r,["DT ORDEM","DATA ORDEM","DT. ORDEM","DATA DA ORDEM"])),
+    dataOrdem:clean(r.dataOrdem||pick(r,[
+      "DT ORDEM","DATA ORDEM","DT. ORDEM","DATA DA ORDEM",
+      "DT DE ORDEM","DATA DE ORDEM","DT ABERTURA","DATA ABERTURA",
+      "DT ABERTURA OP","DATA ABERTURA OP"
+    ])),
     dataInicio:clean(r.dataInicio||pick(r,["DT INICIO","DT INÍCIO","DATA INICIO PREV"])),
     dataFim:clean(r.dataFim||pick(r,["DT FIM","DATA FIM PREV"])),
     qtdFinal:clean(r.qtdFinal||pick(r,["QTD PROD","QTD FINAL","QNTD FINAL"])),
@@ -236,6 +255,52 @@ function dateKey(v){
   if(m){let y=m[3]||"2099"; if(y.length===2)y="20"+y; return (+y)*10000+(+m[2])*100+(+m[1]);}
   return 99999999;
 }
+function parseDateBR(v){
+  const s=clean(v);
+  if(!s) return null;
+
+  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){
+    let y=Number(m[3]);
+    if(y<100) y+=2000;
+    const d=new Date(y,Number(m[2])-1,Number(m[1]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(m){
+    const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
+function diasEmAberto(r){
+  const status=clean(r.status)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .toUpperCase();
+
+  const dtOrdem=parseDateBR(r.dataOrdem);
+  if(!dtOrdem) return "";
+
+  let dtFinal;
+
+  if(status==="FINALIZADO" || status==="FINALIZADA"){
+    dtFinal=parseDateBR(r.dataFim);
+    if(!dtFinal) return "";
+  }else{
+    dtFinal=new Date();
+  }
+
+  const inicioUTC=Date.UTC(dtOrdem.getFullYear(),dtOrdem.getMonth(),dtOrdem.getDate());
+  const fimUTC=Date.UTC(dtFinal.getFullYear(),dtFinal.getMonth(),dtFinal.getDate());
+  const dias=Math.floor((fimUTC-inicioUTC)/86400000);
+
+  return dias < 0 ? 0 : dias;
+}
+
 function statusList(){
   const found=[...new Set(data.map(r=>r.status).filter(Boolean))];
   const ordered=STATUS_ORDER.filter(s=>found.includes(s));
@@ -524,6 +589,7 @@ function renderTable(){
     <td data-label="Dt Ordem">${r.dataOrdem}</td>
     <td data-label="Dt Início">${r.dataInicio}</td>
     <td data-label="Dt Fim">${r.dataFim}</td>
+    <td class="dias-aberto" data-label="Dias em Aberto">${diasEmAberto(r)}</td>
     <td class="qtd-final" data-label="Qtd Final">${r.qtdFinal}</td>
     <td data-label="Setor">${r.setor}</td>
     <td data-label="Status"><span class="tag ${tagClass(r.status)}">${r.status}</span></td>
@@ -552,7 +618,7 @@ const AUTO_UPDATE_MS = 5 * 60 * 1000; // 5 minutos
 
 function matrizParaObjetos(matriz){
   if(!Array.isArray(matriz) || matriz.length < 2) return [];
-  const cabecalhos = matriz[0].map(h => clean(h));
+  const cabecalhos = matriz[0].map(h => String(h ?? "").trim());
   return matriz.slice(1).map(linha => {
     const obj = {};
     cabecalhos.forEach((h,i) => {
