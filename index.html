@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V40</title>
+<title>Painel de Ordens de Produção - V42</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -62,10 +62,17 @@ h1{font-size:22px;margin:0;color:var(--verde);letter-spacing:-.4px}
 .sector-count{font-weight:950;color:#455a4d;font-size:13px}
 
 .main-panel{padding:10px;display:flex;flex-direction:column;overflow:hidden}
-.table-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.search{width:290px;max-width:42vw;border:1px solid var(--linha);border-radius:9px;padding:8px 10px;outline:none;font-size:12px;margin-left:auto}
+.table-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.filters{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-left:auto}
+.filter-field{display:flex;flex-direction:column;gap:2px}
+.filter-field label{font-size:9px;text-transform:uppercase;font-weight:900;color:#557064;letter-spacing:.2px}
+.filter-input{border:1px solid var(--linha);border-radius:9px;padding:6px 8px;outline:none;font-size:12px;color:var(--texto);background:#fff}
+.filter-input:focus,.search:focus{border-color:var(--verde);box-shadow:0 0 0 2px rgba(6,77,54,.12)}
+.filter-input.lote{width:130px}
+.filters .mini-btn{padding:7px 9px}
+.search{width:290px;max-width:42vw;border:1px solid var(--linha);border-radius:9px;padding:8px 10px;outline:none;font-size:12px}
 .table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid #e7ece8;border-radius:11px;scrollbar-width:thin}
-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1565px;font-size:12.5px}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1660px;font-size:12.5px}
 th{position:sticky;top:0;z-index:4;background:#f3f7f3;color:#34463a;text-transform:uppercase;font-size:10.5px;letter-spacing:.2px;text-align:left;padding:9px;border-bottom:1px solid var(--linha)}
 td{padding:8px 9px;border-bottom:1px solid #edf1ed;vertical-align:top;white-space:nowrap}
 td.desc{white-space:normal;min-width:245px;max-width:330px}
@@ -107,6 +114,8 @@ body.smartphone td::before{content:attr(data-label);font-size:9px;text-transform
 body.smartphone td.desc,body.smartphone td.obs{min-width:0;max-width:none}
 body.smartphone .search{width:100%;max-width:none}
 body.smartphone .table-toolbar{align-items:stretch;flex-direction:column}
+body.smartphone .filters{margin-left:0;display:grid;grid-template-columns:1fr 1fr;align-items:end}
+body.smartphone .filter-input,body.smartphone .filter-input.lote{width:100%}
 body.smartphone .footer{flex-direction:column}
 @media(max-width:1450px){
   .kpi-strip{grid-template-columns:repeat(4,minmax(145px,1fr))}
@@ -123,7 +132,9 @@ body.smartphone .footer{flex-direction:column}
   body:not(.desktop-forced) .sector-panel{max-height:230px;margin-bottom:8px}
   body:not(.desktop-forced) .main-panel{overflow:visible}
 }
+.btn:disabled{opacity:.6;cursor:wait}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -139,6 +150,7 @@ body.smartphone .footer{flex-direction:column}
       <div class="actions">
         <div class="connection" id="connection"><span class="dot"></span><span id="connText">Base carregada</span></div>
         <button class="btn" id="phoneBtn" onclick="toggleSmartphone()">▣ Modo Smartphone</button>
+        <button class="btn" id="exportBtn" onclick="exportarExcel()" title="Gera o Excel no modelo do plano de trabalho com as ordens filtradas">⤓ Exportar Excel</button>
         <button class="btn primary" onclick="reloadSharedBase()">↻ Atualizar Agora</button>
       </div>
     </div>
@@ -167,13 +179,19 @@ body.smartphone .footer{flex-direction:column}
     <main class="panel main-panel">
       <div class="table-toolbar">
         <div class="panel-title">Sequenciamento Detalhado</div>
-        <input class="search" id="search" placeholder="Buscar OP, código, descrição ou observação...">
+        <div class="filters">
+          <div class="filter-field"><label for="fDtInicio">Dt Início a partir de</label><input class="filter-input" type="date" id="fDtInicio"></div>
+          <div class="filter-field"><label for="fDtFim">Dt Fim até</label><input class="filter-input" type="date" id="fDtFim"></div>
+          <div class="filter-field"><label for="fLote">Lote</label><input class="filter-input lote" id="fLote" placeholder="Nº do lote"></div>
+          <button class="mini-btn" onclick="clearPeriodo()">Limpar</button>
+          <input class="search" id="search" placeholder="Buscar OP, código, lote, descrição ou observação...">
+        </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
             <th>NR OP</th><th>Código</th><th>Descrição</th><th>UND</th><th>Qtd Prog</th>
-            <th>Dt Ordem</th><th>Dt Início</th><th>Dt Fim</th><th class="dias-aberto-head">DIAS<br>EM<br>ABERTO</th><th>Qtd Final</th><th>Setor</th><th>Status</th>
+            <th>Dt Ordem</th><th>Dt Início</th><th>Dt Fim</th><th class="dias-aberto-head">DIAS<br>EM<br>ABERTO</th><th>Qtd Final</th><th>Lote</th><th>Setor</th><th>Status</th>
             <th>Supervisor</th><th>Observações</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
@@ -182,7 +200,7 @@ body.smartphone .footer{flex-direction:column}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V40 • Dias em aberto • Atualização automática 5 min</span>
+        <span>V42 • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -245,7 +263,10 @@ function normalizeRecord(r){
     status:clean(r.statusOriginal||r.status||pick(r,["STATUS"])),
     supervisor:clean(r.supervisor||pick(r,["SUPERVISOR","LIDER","LÍDER"])),
     obs:clean(r.obs||pick(r,["OBS","OBSERVAÇÕES","OBSERVACOES"])),
-    fase:clean(r.fase||pick(r,["FASE"]))
+    fase:clean(r.fase||pick(r,["FASE"])),
+    entrega:clean(r.entrega||pick(r,["DT ENTREGA","ENTREGA","DATA ENTREGA"])),
+    obsSup:clean(r.obsSup||pick(r,["OBS SUPERVISÃO","OBS SUPERVISAO","OBSERVAÇÃO SUPERVISÃO"])),
+    lote:clean(r.lote||pick(r,["LOTE","NR LOTE","Nº LOTE","N LOTE","NUMERO LOTE","NÚMERO LOTE","LOTE PRODUCAO","LOTE PRODUÇÃO"]))
   };
 }
 function statusKey(s){return clean(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
@@ -309,7 +330,34 @@ function statusList(){
 }
 function searchMatches(r){
   const q=clean(document.getElementById("search").value).toUpperCase();
-  return !q||(`${r.op} ${r.codigo} ${r.descricao} ${r.dataOrdem} ${r.dataInicio} ${r.dataFim} ${r.obs} ${r.setor} ${r.supervisor} ${r.status}`).toUpperCase().includes(q);
+  return !q||(`${r.op} ${r.codigo} ${r.lote} ${r.descricao} ${r.dataOrdem} ${r.dataInicio} ${r.dataFim} ${r.obs} ${r.setor} ${r.supervisor} ${r.status}`).toUpperCase().includes(q);
+}
+
+// Filtro de período: Dt Início da OP >= "Dt Início a partir de" e Dt Fim da OP <= "Dt Fim até".
+// OP ainda sem Dt Fim usa a Dt Início para o limite final, para não sumir com as ordens em aberto.
+function dayNum(d){return d ? Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()) : null;}
+function periodoMatches(r){
+  const de=dayNum(parseDateBR(document.getElementById("fDtInicio").value));
+  const ate=dayNum(parseDateBR(document.getElementById("fDtFim").value));
+  if(de===null && ate===null) return true;
+  const ini=dayNum(parseDateBR(r.dataInicio));
+  if(ini===null) return false;
+  if(de!==null && ini<de) return false;
+  if(ate!==null){
+    const fim=dayNum(parseDateBR(r.dataFim));
+    if((fim ?? ini)>ate) return false;
+  }
+  return true;
+}
+function loteMatches(r){
+  const q=clean(document.getElementById("fLote").value).toUpperCase();
+  return !q||clean(r.lote).toUpperCase().includes(q);
+}
+function clearPeriodo(){
+  document.getElementById("fDtInicio").value="";
+  document.getElementById("fDtFim").value="";
+  document.getElementById("fLote").value="";
+  renderAll();
 }
 
 function filterContext({ignoreStatus=false,ignoreSector=false,ignoreSupervisor=false}={}){
@@ -317,7 +365,7 @@ function filterContext({ignoreStatus=false,ignoreSector=false,ignoreSupervisor=f
     const statusOk=ignoreStatus||!selectedStatuses.size||selectedStatuses.has(r.status);
     const sectorOk=ignoreSector||!selectedSectors.size||selectedSectors.has(r.setor);
     const supervisorOk=ignoreSupervisor||!selectedSupervisors.size||selectedSupervisors.has(r.supervisor);
-    return statusOk&&sectorOk&&supervisorOk&&searchMatches(r);
+    return statusOk&&sectorOk&&supervisorOk&&periodoMatches(r)&&loteMatches(r)&&searchMatches(r);
   });
 }
 
@@ -591,6 +639,7 @@ function renderTable(){
     <td data-label="Dt Fim">${r.dataFim}</td>
     <td class="dias-aberto" data-label="Dias em Aberto">${diasEmAberto(r)}</td>
     <td class="qtd-final" data-label="Qtd Final">${r.qtdFinal}</td>
+    <td data-label="Lote">${r.lote}</td>
     <td data-label="Setor">${r.setor}</td>
     <td data-label="Status"><span class="tag ${tagClass(r.status)}">${r.status}</span></td>
     <td data-label="Supervisor">${r.supervisor}</td>
@@ -675,12 +724,142 @@ function iniciarAtualizacaoAutomatica(){
   return setInterval(reloadSharedBase, AUTO_UPDATE_MS);
 }
 
+// ===== Exportar Excel (mesmo modelo do VBA ExportaSupervisor / FormatarAba) =====
+const STATUS_PLANO = ["Produção","Não Iniciada"]; // sem status escolhido, exporta o plano de trabalho (como o VBA)
+const XL_COLS = [
+  {cab:"NR OP",w:9},{cab:"CODIGO",w:9},{cab:"DESCRIÇÃO",w:60,left:true},{cab:"UND",w:6},
+  {cab:"QTD",w:9,fmt:"#,##0"},{cab:"DT ORDEM",w:11,fmt:"dd/mm/yyyy;;"},{cab:"SEQ",w:6},
+  {cab:"DT INICIO",w:11,fmt:"dd/mm/yyyy;;"},{cab:"DT FIM",w:11,fmt:"dd/mm/yyyy;;"},{cab:"PROD",w:9,fmt:"#,##0;;"},
+  {cab:"ENTREGA",w:11,fmt:"dd/mm/yyyy;;"},{cab:"OBS",w:36,left:true,wrap:true,fmt:"General;\\-General;;@"},
+  {cab:"OBS SUPERVISÃO",w:30,left:true,wrap:true,fmt:"General;\\-General;;@"}
+];
+function xlNum(v){
+  const s=clean(v); if(!s) return null;
+  const t=s.includes(",") ? s.replace(/\./g,"").replace(",",".") : s;
+  const n=Number(t); return isNaN(n) ? s : n;
+}
+function xlDate(v){const d=parseDateBR(v); return d ? new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())) : null;}
+function chaveData(v){const d=parseDateBR(v); return d ? dayNum(d) : 9e15;}
+// Pedido = tem data de ENTREGA ou OBS com "Pedido" / "P:" / "P "; OBS com "REPOS" é reposição
+function ehPedido(r){
+  if(parseDateBR(r.entrega)) return true;
+  const o=clean(r.obs).toUpperCase();
+  if(o.includes("REPOS")) return false;
+  return o.includes("PEDIDO")||o.startsWith("P:")||o.startsWith("P ");
+}
+function limpaNome(t){
+  t=String(t||"").replace(/[\\\/?*\[\]:"<>|]/g," ").replace(/\s+/g," ").trim().replace(/^'+|'+$/g,"");
+  return (t||"Sem_Nome").slice(0,31);
+}
+function hojeBR(sep){const d=new Date();return [d.getDate(),d.getMonth()+1].map(n=>String(n).padStart(2,"0")).join(sep)+sep+d.getFullYear();}
+
+function linhasExportar(){
+  let rows=filterContext();
+  if(!selectedStatuses.size) rows=rows.filter(r=>STATUS_PLANO.includes(r.status));
+  return rows;
+}
+
+async function exportarExcel(){
+  if(typeof ExcelJS==="undefined"){alert("Não consegui carregar o gerador de Excel. Verifique a internet e tente de novo.");return;}
+  const rows=linhasExportar();
+  if(!rows.length){
+    alert(selectedStatuses.size ? "Nenhuma ordem para exportar com os filtros atuais."
+      : "Nenhuma ordem em Produção ou Não Iniciada com os filtros atuais. Para exportar outro status, selecione-o nos cartões de status.");
+    return;
+  }
+  const btn=document.getElementById("exportBtn"); btn.disabled=true; btn.textContent="Gerando...";
+  try{
+    const porSetor={};
+    rows.forEach(r=>{const s=r.setor||"Sem Setor";(porSetor[s]=porSetor[s]||[]).push(r);});
+    const wb=new ExcelJS.Workbook();
+    const nomes=new Set();
+    Object.keys(porSetor).sort((a,b)=>a.localeCompare(b,"pt-BR")).forEach(setor=>{
+      let nm=limpaNome(setor),k=0;
+      while(nomes.has(nm.toUpperCase())){k++;nm=limpaNome(setor.slice(0,26)+" ("+k+")");}
+      nomes.add(nm.toUpperCase());
+      montarAba(wb.addWorksheet(nm,{views:[{showGridLines:false}]}),setor,porSetor[setor]);
+    });
+    const quem=selectedSupervisors.size===1 ? [...selectedSupervisors][0]
+      : selectedSectors.size===1 ? [...selectedSectors][0] : "Ordens";
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`Producao_${limpaNome(quem)}_${hojeBR("-")}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  }catch(err){
+    console.error("Erro ao gerar Excel:",err);
+    alert("Erro ao gerar o Excel: "+err.message);
+  }finally{
+    btn.disabled=false; btn.textContent="⤓ Exportar Excel";
+  }
+}
+
+function montarAba(ws,setor,lista){
+  const AZUL_TIT="FF1F3864", AZUL_CAB="FF1F497D", CINZA="FFB4B4B4", n=XL_COLS.length;
+  // Demais setores: Pedido 1º > DT INICIO > DT ORDEM > NR OP (SEQ contínuo)
+  const ord=lista.map(r=>({r,k:[ehPedido(r)?0:1,chaveData(r.dataInicio),chaveData(r.dataOrdem),Number(r.op)||9e15]}))
+    .sort((a,b)=>{for(let i=0;i<4;i++){if(a.k[i]!==b.k[i])return a.k[i]-b.k[i];}return 0;}).map(x=>x.r);
+
+  ws.columns=XL_COLS.map(c=>({width:c.w+0.71}));
+  // título
+  ws.mergeCells(1,1,1,n);
+  const t=ws.getCell(1,1);
+  t.value=`Ordens de Produção - ${setor}   (${hojeBR("/")})`;
+  t.font={name:"Segoe UI",size:16,bold:true,color:{argb:"FFFFFFFF"}};
+  t.fill={type:"pattern",pattern:"solid",fgColor:{argb:AZUL_TIT}};
+  t.alignment={horizontal:"center",vertical:"middle"};
+  ws.getRow(1).height=30;
+  ws.getRow(2).height=6;
+  // cabeçalho
+  const h=ws.getRow(3); h.height=28;
+  XL_COLS.forEach((c,i)=>{
+    const cell=h.getCell(i+1); cell.value=c.cab;
+    cell.font={name:"Segoe UI",size:10,bold:true,color:{argb:"FFFFFFFF"}};
+    cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:AZUL_CAB}};
+    cell.alignment={horizontal:"center",vertical:"middle",wrapText:false};
+  });
+  // dados
+  ord.forEach((r,idx)=>{
+    const vals=[xlNum(r.op),xlNum(r.codigo),r.descricao||null,r.und||null,xlNum(r.qtdPrev),xlDate(r.dataOrdem),idx+1,
+      xlDate(r.dataInicio),xlDate(r.dataFim),xlNum(r.qtdFinal),xlDate(r.entrega),r.obs||null,r.obsSup||null];
+    const row=ws.getRow(4+idx);
+    vals.forEach((v,i)=>{
+      const c=XL_COLS[i], cell=row.getCell(i+1);
+      cell.value=v;
+      cell.font={name:"Segoe UI",size:10};
+      cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
+      cell.alignment={horizontal:c.left?"left":"center",vertical:"middle",wrapText:!!c.wrap};
+      if(c.fmt) cell.numFmt=c.fmt;
+    });
+    // altura: mínimo 26, cresce quando OBS / OBS SUPERVISÃO quebram linha
+    const linhas=Math.max(1,Math.ceil(clean(r.obs).length/40),Math.ceil(clean(r.obsSup).length/33));
+    row.height=Math.max(26,linhas*13.5+4);
+  });
+  // bordas finas cinza + contorno médio azul
+  const ult=3+ord.length;
+  for(let rr=3;rr<=ult;rr++){
+    for(let cc=1;cc<=n;cc++){
+      const fino={style:"thin",color:{argb:CINZA}}, medio={style:"medium",color:{argb:AZUL_CAB}};
+      ws.getCell(rr,cc).border={
+        top:rr===3?medio:fino, bottom:rr===ult?medio:fino,
+        left:cc===1?medio:fino, right:cc===n?medio:fino
+      };
+    }
+  }
+  ws.pageSetup={orientation:"landscape",paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
+    margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.31,footer:0.31},printTitlesRow:"3:3"};
+}
+
 function toggleSmartphone(){
   const active=document.body.classList.toggle("smartphone");
   document.body.classList.toggle("desktop-forced",!active && window.innerWidth<=900);
   document.getElementById("phoneBtn").textContent=active?"▣ Sair do Smartphone":"▣ Modo Smartphone";
 }
 document.getElementById("search").addEventListener("input",renderAll);
+document.getElementById("fLote").addEventListener("input",renderAll);
+["fDtInicio","fDtFim"].forEach(id=>document.getElementById(id).addEventListener("change",renderAll));
 
 setData(FALLBACK_DATA,"Base carregada");
 setTimeout(iniciarAtualizacaoAutomatica,150);
