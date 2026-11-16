@@ -1093,7 +1093,7 @@ function cjEsc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"
 function cjDataCurta(v){const d=parseDateBR(v); return d ? String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0") : "";}
 function cjDataLonga(v){const d=parseDateBR(v); return d ? d.toLocaleDateString("pt-BR") : "—";}
 const DIA_MS=864e5;
-function cjDM(ms){const d=new Date(ms); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");}
+function cjDM(ms){const d=new Date(ms); return String(d.getUTCDate()).padStart(2,"0")+"/"+String(d.getUTCMonth()+1).padStart(2,"0");}
 // Lead time de envase (dias) por código do produto: Cadastro de Produtos do Controle_Cereja
 const CJ_LEAD={45:1,51278:1,2610:2.5,2781:2,51869:2,1920:3,52406:3,54031:3,54713:3,53364:3,2235:4,56318:4,2484:4,1024:2,54674:2,594:1,
   2611:2.5,53390:2.5,2378:2.5,70:1.5,51279:1.5,55481:1.5,2782:3,51766:3,88:5,53382:5,54149:5,54391:2,2604:2.5,1244:2.5,690:2.5,51280:2.5,55431:2.5,61:3,51281:3,53958:2,55144:3};
@@ -1368,7 +1368,7 @@ function abrirTanque(i){
         <div class="cm-f"><span>Início do preparo</span><b>${cjDataLonga(t.inicio)}</b></div>
         <div class="cm-f"><span>Pronto p/ envase</span><b>${cjDataLonga(t.envase)}</b></div>
         <div class="cm-f"><span>Lead time de envase</span><b>${t.lead?cjKg(t.lead)+" dia(s)":"—"}</b></div>
-        <div class="cm-f"><span>Fim do envase previsto</span><b>${t.fimEnvN?new Date(t.fimEnvN).toLocaleDateString("pt-BR"):"—"}</b></div>
+        <div class="cm-f"><span>Fim do envase previsto</span><b>${t.fimEnvN?new Date(t.fimEnvN).toLocaleDateString("pt-BR",{timeZone:"UTC"}):"—"}</b></div>
         <div class="cm-f"><span>Fim do envase (real)</span><b>${cjDataLonga(t.envaseReal)}</b></div>
         <div class="cm-f ${s.cls==="st-atraso"?"cm-atraso":""}"><span>Atraso no envase</span><b>${s.cls==="st-atraso"?s.atraso+" dia(s)":"—"}</b></div>
         <div class="cm-f"><span>Capacidade / Kg útil</span><b>${cjKg(t.capac)} / ${cjKg(t.util)} kg</b></div>
