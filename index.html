@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V43</title>
+<title>Painel de Ordens de Produção - V44</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -267,6 +267,29 @@ body.smartphone.has-menu .app{margin-left:0}
   body:not(.desktop-forced) .side-sep{display:none}
   body.has-menu:not(.desktop-forced) .app{margin-left:0}
 }
+/* V44: envase e atraso */
+.cj-kpis{grid-template-columns:repeat(6,minmax(140px,1fr))}
+@media(max-width:1400px){.cj-kpis{grid-template-columns:repeat(3,minmax(140px,1fr))}}
+@media(max-width:760px){.cj-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cj-kpi.kpi-atraso{background:#fff1f1;border-color:#f3b4b4}
+.cj-kpi.kpi-atraso b{color:#c00000}
+.cj-kpi.kpi-atraso small{color:#a11;font-weight:800;white-space:normal}
+.st-envase .tb-count{color:#0b8a43}
+.st-envase .tank-badge{background:#ecfbf1;border-color:#9fdcb7}
+.st-envase .tank-badge::after{border-color:#9fdcb7}
+.st-atraso .tb-count{color:#fff}
+.st-atraso .tb-date{color:#ffe0e0}
+.st-atraso .tank-badge{background:#c00000;border-color:#c00000;animation:atrasoPulse 1.4s ease-in-out infinite}
+.st-atraso .tank-badge::after{border-color:#c00000}
+@keyframes atrasoPulse{0%,100%{box-shadow:0 0 0 0 rgba(192,0,0,.45)}50%{box-shadow:0 0 0 8px rgba(192,0,0,0)}}
+.gt-bar.atraso{background:#c00000;padding:0;gap:0}
+.gt-bar.atraso span{flex:1 1 0;text-align:center;border-left:1px solid rgba(255,255,255,.35)}
+.gt-bar.atraso span:first-child{border-left:0}
+.cm-f.cm-atraso{background:#fff1f1;border-color:#f3b4b4}
+.cm-f.cm-atraso b{color:#c00000}
+.cm-scroll{overflow-x:auto}
+.cm-items{min-width:720px}
+.cj-card{width:min(1000px,100%)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
@@ -345,7 +368,7 @@ body.smartphone.has-menu .app{margin-left:0}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V43 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
+        <span>V44 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -357,7 +380,8 @@ body.smartphone.has-menu .app{margin-left:0}
         </div>
         <div class="gt-legend">
           <span><i style="background:#f0a020"></i>Em preparo</span>
-          <span><i style="background:#17a259"></i>Pronto p/ envase</span>
+          <span><i style="background:#17a259"></i>Em envase</span>
+          <span><i style="background:#c00000"></i>Atraso no envase</span>
           <span><i style="background:#1266d6"></i>Aguardando início</span>
           <span><i style="background:#9aa3a0"></i>Livre</span>
           <span style="color:#7b857f">Clique no tanque para ver os itens</span>
@@ -367,10 +391,10 @@ body.smartphone.has-menu .app{margin-left:0}
       <div class="cj-floor"><div class="cj-grid" id="cjGrid"></div></div>
       <div class="cj-gantt">
         <div class="gt-head"><div class="panel-title">Cronograma de ocupação</div>
-          <div class="gt-legend"><span><i style="background:#e07b00"></i>Preparo (início → envase previsto)</span><span><i style="background:#17a259"></i>Pronto aguardando envase</span><span><i style="background:var(--vermelho)"></i>Hoje</span></div></div>
+          <div class="gt-legend"><span><i style="background:#e07b00"></i>Preparo (início → pronto p/ envase)</span><span><i style="background:#17a259"></i>Envase (lead time da embalagem)</span><span><i style="background:#c00000"></i>Atraso no envase (nº = dia de atraso)</span><span><i style="background:var(--vermelho)"></i>Hoje</span></div></div>
         <div class="gt-scroll" id="cjGantt"></div>
       </div>
-      <div class="footer"><span>Dias contados até o envase previsto (Fatiada: 7 dias de preparo; demais: 15 dias)</span><span>V43 • Controle Cereja • Atualização automática 5 min</span></div>
+      <div class="footer"><span>Preparo: Fatiada 7 dias, demais 15 dias • Envase: lead time por embalagem • Nível do tanque = saldo (kg útil − kg envasado)</span><span>V44 • Controle Cereja • Atualização automática 5 min</span></div>
     </section>
 </div>
 <div class="cj-modal" id="cjModal"><div class="cj-card" id="cjCard"></div></div>
@@ -1069,6 +1093,16 @@ function cjEsc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"
 function cjDataCurta(v){const d=parseDateBR(v); return d ? String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0") : "";}
 function cjDataLonga(v){const d=parseDateBR(v); return d ? d.toLocaleDateString("pt-BR") : "—";}
 const DIA_MS=864e5;
+function cjDM(ms){const d=new Date(ms); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");}
+// Lead time de envase (dias) por código do produto: Cadastro de Produtos do Controle_Cereja
+const CJ_LEAD={45:1,51278:1,2610:2.5,2781:2,51869:2,1920:3,52406:3,54031:3,54713:3,53364:3,2235:4,56318:4,2484:4,1024:2,54674:2,594:1,
+  2611:2.5,53390:2.5,2378:2.5,70:1.5,51279:1.5,55481:1.5,2782:3,51766:3,88:5,53382:5,54149:5,54391:2,2604:2.5,1244:2.5,690:2.5,51280:2.5,55431:2.5,61:3,51281:3,53958:2,55144:3};
+const CJ_FIM_OK=["finalizada","ag-rotulagem","ag-empacotar","cancelada"];
+function cjRendimento(t){
+  if(/fatiada/i.test(t.tipo)) return /balde/i.test(t.categoria) ? 1.17 : 1.04;
+  if(/com cabo/i.test(t.tipo)) return 0.84;
+  return 0;  // Sem Cabo / Amarena: mantém o kg útil enviado pela planilha
+}
 function cjHoje(){return dayNum(new Date());}
 
 function cerejaDeMatriz(matriz){
@@ -1085,14 +1119,18 @@ function cerejaDeMatriz(matriz){
       tipo:clean(g(l,"TIPO")), categoria:clean(g(l,"CATEGORIA")), grupo:clean(g(l,"GRUPO")),
       inicio:clean(g(l,"INICIO_PREPARO")), envase:clean(g(l,"ENVASE_PREVISTO")), envaseReal:clean(g(l,"ENVASE_REAL")),
       fim:clean(g(l,"FIM_OCUPACAO")), statusPlan:clean(g(l,"STATUS")), obs:clean(g(l,"OBS")),
-      restantePlan:clean(g(l,"KG_RESTANTE")), itens:[]
+      restantePlan:clean(g(l,"KG_RESTANTE")), itens:[],
+      fase2:col("SALDO_KG")>=0, envasadoPlan:clean(g(l,"KG_ENVASADO_TQ")), saldoPlan:clean(g(l,"SALDO_KG")),
+      leadPlan:clean(g(l,"LEAD_DIAS")), fimEnvase:clean(g(l,"FIM_ENVASE")), opsAbertas:clean(g(l,"OPS_ABERTAS"))
     });
     const t=mapa.get(nome);
     const produto=clean(g(l,"PRODUTO"));
-    if(produto) t.itens.push({op:clean(g(l,"NR_OP")), produto, und:clean(g(l,"UND")), qtd:cjNum(g(l,"QTD")), kg:cjNum(g(l,"KG_USADO"))});
+    if(produto) t.itens.push({op:clean(g(l,"NR_OP")), produto, und:clean(g(l,"UND")), qtd:cjNum(g(l,"QTD")), kg:cjNum(g(l,"KG_USADO")),
+      statusOp:clean(g(l,"STATUS_OP")), apont:clean(g(l,"QTD_APONTADA")), kgEnv:clean(g(l,"KG_ENVASADO")), lead:clean(g(l,"LEAD_ITEM"))});
   });
   const lista=[...mapa.values()].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR",{numeric:true}));
   lista.forEach(t=>{
+    if(!t.fase2){const f=cjRendimento(t); if(f && t.capac) t.util=Math.round(t.capac*f);}
     t.usado=t.itens.reduce((s,i)=>s+i.kg,0);
     t.restante=t.restantePlan!=="" ? cjNum(t.restantePlan) : Math.max(0,t.util-t.usado);
     if(!t.itens.length) t.restante=t.util;
@@ -1102,21 +1140,57 @@ function cerejaDeMatriz(matriz){
   return lista;
 }
 
+// Envase: kg envasado pelos apontamentos das OPs, saldo do tanque e lead time (recalcula com o status mais novo das OPs do painel)
+function cjEnvase(t){
+  const opMap=new Map((typeof data!=="undefined"?data:[]).map(r=>[String(r.op),r]));
+  let kgLead=0, somaLead=0;
+  t.itens.forEach(it=>{
+    const r=opMap.get(String(it.op));
+    if(!it.statusOp && r) it.statusOp=r.status||"";
+    if(it.kgEnv===""){
+      const prod=r?cjNum(r.qtdFinal):0, prog=r?cjNum(r.qtdPrev):0, mesmaUnd=r && clean(r.und).toLowerCase()===clean(it.und).toLowerCase();
+      it.kgEnvN=!r?0:((mesmaUnd||!prog) ? (it.qtd?prod*it.kg/it.qtd:0) : prod/prog*it.kg);
+      it.apontN=prod;
+    } else { it.kgEnvN=cjNum(it.kgEnv); it.apontN=cjNum(it.apont); }
+    it.leadN=it.lead!=="" ? cjNum(it.lead) : (CJ_LEAD[parseInt(it.produto,10)]||0);
+    if(it.leadN) somaLead=Math.max(somaLead,it.leadN);
+    it.fimOk=CJ_FIM_OK.includes(statusKey(it.statusOp));
+  });
+  t.envasado=t.envasadoPlan!=="" ? cjNum(t.envasadoPlan) : t.itens.reduce((s,i)=>s+i.kgEnvN,0);
+  t.saldo=t.saldoPlan!=="" ? cjNum(t.saldoPlan) : Math.max(0,Math.round(t.util-t.envasado));
+  t.pctSaldo=t.util ? Math.min(1,Math.max(0,t.saldo/t.util)) : 0;
+  t.lead=t.leadPlan!=="" ? cjNum(t.leadPlan) : somaLead;   // lead do tanque = o maior lead entre os itens
+  t.todosFim=t.itens.length>0 && t.itens.every(i=>i.fimOk);
+}
+
 // Mesma regra da coluna Status do Controle_Cereja, recalculada com a data de hoje
 function cjSituacao(t){
+  cjEnvase(t);
   const hoje=cjHoje();
   const ini=dayNum(parseDateBR(t.inicio)), env=dayNum(parseDateBR(t.envase));
-  if(parseDateBR(t.envaseReal)) return {cls:"st-envasado",txt:"Envasado",cont:"ENVASADO",sub:"em "+cjDataCurta(t.envaseReal),cor:"#4f5f8a"};
+  const dLead=Math.ceil(t.lead||0);
+  const fimEnv=env && dLead ? env+(dLead-1)*DIA_MS : 0;
+  t.fimEnvN=fimEnv;
+  if(parseDateBR(t.envaseReal) || t.todosFim || (t.envasado>0 && t.saldo<=0))
+    return {cls:"st-envasado",txt:"Envasado",cont:"ENVASADO",sub:parseDateBR(t.envaseReal)?"em "+cjDataCurta(t.envaseReal):"tanque liberado",cor:"#4f5f8a",nivel:0};
   if(!ini || !env){
-    return t.itens.length ? {cls:"st-aguard",txt:"Programado, sem data",cont:"SEM DATA",sub:"defina o início",cor:"#1266d6"}
-                          : {cls:"st-livre",txt:"Livre",cont:"LIVRE",sub:"sem programação",cor:"#9aa3a0"};
+    return t.itens.length ? {cls:"st-aguard",txt:"Programado, sem data",cont:"SEM DATA",sub:"defina o início",cor:"#1266d6",nivel:0}
+                          : {cls:"st-livre",txt:"Livre",cont:"LIVRE",sub:"sem programação",cor:"#9aa3a0",nivel:0};
   }
+  const nivel=t.pctSaldo;
   const dias=Math.round((env-hoje)/DIA_MS);
-  if(hoje<ini){const n=Math.round((ini-hoje)/DIA_MS); return {cls:"st-aguard",txt:"Aguardando início",cont:`${n} <small>${n===1?"DIA":"DIAS"} P/ INICIAR</small>`,sub:"",dias,cor:"#1266d6"};}
-  if(dias>0) return {cls:"st-prep",txt:"Em produção",cont:`${dias} <small>${dias===1?"DIA":"DIAS"}</small>`,sub:"",dias,cor:"#f0a020",
+  if(hoje<ini){const n=Math.round((ini-hoje)/DIA_MS); return {cls:"st-aguard",txt:"Aguardando início",cont:`${n} <small>${n===1?"DIA":"DIAS"} P/ INICIAR</small>`,sub:"",dias,cor:"#1266d6",nivel};}
+  if(dias>0) return {cls:"st-prep",txt:"Em preparo",cont:`${dias} <small>${dias===1?"DIA":"DIAS"} P/ ENVASE</small>`,sub:"",dias,cor:"#f0a020",nivel,
     prog:Math.min(1,Math.max(0,(hoje-ini)/(env-ini)))};
-  if(dias===0) return {cls:"st-pronto",txt:"Pronto p/ envase",cont:"PRONTO HOJE",sub:"",dias,cor:"#17a259"};
-  return {cls:"st-pronto",txt:"Pronto p/ envase",cont:"PRONTO",sub:`há ${-dias} ${-dias===1?"dia":"dias"}`,dias,cor:"#17a259"};
+  if(!fimEnv) return {cls:"st-pronto",txt:"Pronto p/ envase",cont:dias===0?"PRONTO HOJE":"PRONTO",sub:dias<0?`há ${-dias} ${-dias===1?"dia":"dias"}`:"",dias,cor:"#17a259",nivel};
+  if(hoje<=fimEnv){
+    const k=Math.round((hoje-env)/DIA_MS)+1;
+    return {cls:"st-envase",txt:`Em envase (dia ${k} de ${dLead})`,cont:`ENVASE <small>DIA ${k} DE ${dLead}</small>`,sub:"termina "+cjDM(fimEnv),dias,cor:"#17a259",nivel};
+  }
+  const atraso=Math.round((hoje-fimEnv)/DIA_MS);
+  t.atraso=atraso;
+  return {cls:"st-atraso",txt:`Atraso no envase: ${atraso} ${atraso===1?"dia":"dias"}`,cont:`${atraso} <small>${atraso===1?"DIA":"DIAS"} ATRASO ENVASE</small>`,
+    sub:"envase previsto até "+cjDM(fimEnv),dias,atraso,cor:"#c00000",nivel};
 }
 
 const TK_BODY="M32,62 L32,178 Q32,186 38,191 L70,214 Q74,217 80,217 Q86,217 90,214 L122,191 Q128,186 128,178 L128,62 Z";
@@ -1124,23 +1198,24 @@ const TK_TOP=214, TK_FULL=68;
 function cjWave(y){let d=`M-80,${y} q20,-5 40,0`; for(let i=0;i<9;i++) d+=" t40,0"; return d+" L320,260 L-80,260 Z";}
 function tanqueSvg(t,sit,idx,animar){
   const amarena=/amarena/i.test(t.tipo);
-  const nivel=TK_TOP-(TK_TOP-TK_FULL)*t.pctOcup;
+  const pctN=sit.nivel??t.pctOcup;
+  const nivel=TK_TOP-(TK_TOP-TK_FULL)*pctN;
   const prof=TK_TOP-nivel;
-  const ativo=sit.cls==="st-prep";
+  const ativo=sit.cls==="st-prep"||sit.cls==="st-envase";
   const num=(t.nome.match(/\d+/)||[""])[0].padStart(2,"0");
   const bolhas=(ativo && prof>24) ? [0,1,2,3,4].map(k=>{
     const x=48+((k*37+idx*13)%64), r=1.6+(k%3)*.8, rise=Math.max(12,prof-14);
     return `<circle class="bub" cx="${x}" cy="${prof-6}" r="${r}" fill="rgba(255,255,255,.7)" style="--rise:${rise};animation-delay:${(k*.7+idx*.31)%3.4}s;animation-name:bubUp${idx}"/>`;
   }).join("") : "";
   const kfBolha=bolhas ? `<style>@keyframes bubUp${idx}{0%{transform:translateY(0);opacity:0}15%{opacity:.8}100%{transform:translateY(-${Math.max(12,prof-14)}px);opacity:0}}</style>` : "";
-  const liq=t.pctOcup>0 ? `
+  const liq=pctN>0 ? `
       <g class="liq" style="transform:translateY(${animar?TK_TOP:nivel}px)" data-nivel="${nivel}">
         <path class="wave w2" d="${cjWave(2)}" fill="url(#${amarena?"tkLiqA":"tkLiqC"})"/>
         <path class="wave" d="${cjWave(4)}" fill="url(#${amarena?"tkLiqA":"tkLiqC"})" opacity=".93"/>
         ${bolhas}
       </g>` : "";
-  const pct=t.pctOcup>0 ? Math.round(t.pctOcup*100)+"%" : "VAZIO";
-  return `<svg class="tank-svg" viewBox="0 0 160 250" role="img" aria-label="${cjEsc(t.nome)}: ${pct} ocupado">
+  const pct=pctN>0 ? Math.round(pctN*100)+"%" : "VAZIO";
+  return `<svg class="tank-svg" viewBox="0 0 160 250" role="img" aria-label="${cjEsc(t.nome)}: ${pct} de saldo">
     ${kfBolha}
     <ellipse cx="80" cy="243" rx="60" ry="6" fill="rgba(0,0,0,.16)"/>
     <rect x="77" y="186" width="6" height="52" rx="2" fill="#7d8a90"/>
@@ -1159,10 +1234,10 @@ function tanqueSvg(t,sit,idx,animar){
     <path d="M32,62 Q32,40 80,36 Q128,40 128,62 Z" fill="url(#tkDome)" stroke="#5c6a70" stroke-width="1.2"/>
     <ellipse cx="80" cy="62" rx="48" ry="5" fill="none" stroke="#8f9ca2" stroke-width="2"/>
     <rect x="69" y="16" width="22" height="18" rx="3" fill="url(#tkMotor)" stroke="#3e4a4f" stroke-width="1"/><rect x="74" y="12" width="12" height="5" rx="1.5" fill="#3e4a4f"/>
-    <circle class="${ativo||sit.cls==="st-pronto"?"lamp":""}" cx="112" cy="50" r="4.5" fill="${sit.cor}" stroke="#fff" stroke-width="1.2"/>
+    <circle class="${ativo||sit.cls==="st-pronto"||sit.cls==="st-atraso"?"lamp":""}" cx="112" cy="50" r="4.5" fill="${sit.cor}" stroke="#fff" stroke-width="1.2"/>
     <rect x="60" y="74" width="40" height="15" rx="3" fill="#0b3d2c" opacity=".92"/><text x="80" y="85" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff" font-family="Segoe UI,Arial">T-${num}</text>
-    <text x="80" y="140" text-anchor="middle" font-size="${t.pctOcup>0?25:17}" font-weight="900" font-family="Segoe UI,Arial"
-      fill="${t.pctOcup>0.35?"#fff":"#36454b"}" stroke="${t.pctOcup>0.35?"rgba(60,0,10,.35)":"none"}" stroke-width="1">${pct}</text>
+    <text x="80" y="140" text-anchor="middle" font-size="${pctN>0?25:17}" font-weight="900" font-family="Segoe UI,Arial"
+      fill="${pctN>0.35?"#fff":"#36454b"}" stroke="${pctN>0.35?"rgba(60,0,10,.35)":"none"}" stroke-width="1">${pct}</text>
   </svg>`;
 }
 
@@ -1179,7 +1254,7 @@ function renderCereja(){
     const s=sits[i];
     return `<button class="tank ${s.cls}" style="animation-delay:${i*60}ms" onclick="abrirTanque(${i})" title="Clique para ver os itens programados">
       <div class="tank-badge">
-        <div class="tb-date">${t.envase ? "Envase "+cjDataCurta(t.envase) : (t.itens.length?"Sem data":"Disponível")}</div>
+        <div class="tb-date">${t.envase ? "Pronto p/ envase "+cjDataCurta(t.envase) : (t.itens.length?"Sem data":"Disponível")}</div>
         <div class="tb-count">${s.cont}</div>
         ${s.sub?`<div class="tb-date" style="text-transform:none">${s.sub}</div>`:""}
       </div>
@@ -1188,9 +1263,10 @@ function renderCereja(){
       <div class="tank-info">
         <div class="ti-row"><span>Capacidade</span><b>${cjKg(t.capac)} kg</b></div>
         <div class="ti-row"><span>Kg útil</span><b>${cjKg(t.util)} kg</b></div>
-        <div class="ti-bar"><i style="width:0" data-w="${(t.pctOcup*100).toFixed(1)}%"></i></div>
         <div class="ti-row"><span>Programado</span><b>${cjKg(t.usado)} kg</b></div>
-        <div class="ti-row"><span>Restante</span><b class="ti-rest ${t.restante<=0?"zero":""}">${cjKg(t.restante)} kg · ${Math.round(t.pctRest*100)}%</b></div>
+        <div class="ti-row"><span>Envasado</span><b>${cjKg(t.envasado)} kg</b></div>
+        <div class="ti-bar"><i style="width:0" data-w="${(t.pctSaldo*100).toFixed(1)}%"></i></div>
+        <div class="ti-row"><span>Saldo</span><b class="ti-rest ${t.saldo<=0?"zero":""}">${cjKg(t.saldo)} kg · ${Math.round(t.pctSaldo*100)}%</b></div>
       </div>
     </button>`;
   }).join("");
@@ -1201,20 +1277,23 @@ function renderCereja(){
   }));
 
   // indicadores
-  const ocupados=lista.filter(t=>t.itens.length).length;
-  const prontos=sits.filter(s=>s.cls==="st-pronto").length;
-  const totUtil=lista.reduce((s,t)=>s+t.util,0), totUsado=lista.reduce((s,t)=>s+t.usado,0), totRest=lista.reduce((s,t)=>s+t.restante,0);
+  const ativos=lista.map((t,i)=>({t,s:sits[i]})).filter(x=>!["st-livre","st-envasado"].includes(x.s.cls));
+  const nPrep=sits.filter(s=>s.cls==="st-prep").length, nEnv=sits.filter(s=>s.cls==="st-envase"||s.cls==="st-pronto").length;
+  const atrasados=lista.map((t,i)=>({t,s:sits[i]})).filter(x=>x.s.cls==="st-atraso").sort((a,b)=>b.s.atraso-a.s.atraso);
+  const totEnv=ativos.reduce((s,x)=>s+x.t.envasado,0), totSaldo=ativos.reduce((s,x)=>s+x.t.saldo,0), totUtil=ativos.reduce((s,x)=>s+x.t.util,0);
   const prox=lista.map((t,i)=>({t,s:sits[i]})).filter(x=>x.s.cls==="st-prep").sort((a,b)=>a.s.dias-b.s.dias)[0];
   document.getElementById("cjKpis").innerHTML=`
-    <div class="cj-kpi"><span>Tanques ocupados</span><b>${ocupados} / ${lista.length}</b><small>${lista.length-ocupados} livre(s)</small></div>
-    <div class="cj-kpi"><span>Prontos p/ envase</span><b style="color:#0b8a43">${prontos}</b><small>aguardando envase</small></div>
-    <div class="cj-kpi"><span>Kg programado</span><b>${cjKg(totUsado)} kg</b><small>${totUtil?Math.round(totUsado/totUtil*100):0}% da capacidade útil</small></div>
-    <div class="cj-kpi"><span>Kg restante</span><b style="color:#0b6548">${cjKg(totRest)} kg</b><small>de ${cjKg(totUtil)} kg úteis</small></div>
-    <div class="cj-kpi"><span>Próximo envase</span><b>${prox?cjEsc(prox.t.nome):"—"}</b><small>${prox?`${cjDataLonga(prox.t.envase)} · em ${prox.s.dias} dia(s)`:"nenhum tanque em preparo"}</small></div>`;
+    <div class="cj-kpi"><span>Tanques ocupados</span><b>${ativos.length} / ${lista.length}</b><small>${lista.length-ativos.length} livre(s) ou envasado(s)</small></div>
+    <div class="cj-kpi"><span>Em preparo</span><b style="color:#b86e00">${nPrep}</b><small>${prox?`próximo: ${cjEsc(prox.t.nome)} em ${prox.s.dias} dia(s)`:"nenhum em preparo"}</small></div>
+    <div class="cj-kpi"><span>Em envase</span><b style="color:#0b8a43">${nEnv}</b><small>dentro do lead time</small></div>
+    <div class="cj-kpi ${atrasados.length?"kpi-atraso":""}"><span>Atraso no envase</span><b>${atrasados.length}</b><small>${atrasados.length?atrasados.map(x=>`${cjEsc(x.t.nome.replace(/tanque\s*/i,"T-"))}: ${x.s.atraso}d`).join(" · "):"nenhum tanque atrasado"}</small></div>
+    <div class="cj-kpi"><span>Kg envasado</span><b>${cjKg(totEnv)} kg</b><small>apontamentos das OPs</small></div>
+    <div class="cj-kpi"><span>Saldo nos tanques</span><b style="color:#0b6548">${cjKg(totSaldo)} kg</b><small>${totUtil?Math.round(totSaldo/totUtil*100):0}% de ${cjKg(totUtil)} kg úteis</small></div>`;
   renderGantt(lista);
 }
 
 function renderGantt(lista){
+  const sits=lista.map(cjSituacao);
   const hoje=cjHoje(), ini0=hoje-14*DIA_MS, nd=36, fimJ=ini0+nd*DIA_MS;
   const dias=[...Array(nd)].map((_,j)=>new Date(ini0+j*DIA_MS));
   const sem=["D","S","T","Q","Q","S","S"];
@@ -1240,8 +1319,25 @@ function renderGantt(lista){
     if(a && b){
       const nomes=t.itens.map(x=>x.produto.split(" - ")[0]).join(", ");
       bars+=barra(a,b,"prep",`Preparo → envase ${cjDataCurta(t.envase)}${nomes?" · "+cjEsc(nomes):""}`);
-      const fimPronto=real ? real : Math.max(hoje+DIA_MS,b+DIA_MS);
-      if(!real || real>b) bars+=barra(b,fimPronto,"ready",(fimPronto-b)>2*DIA_MS?"Pronto p/ envase":"✓");
+      const fe=t.fimEnvN;
+      if(fe){
+        const fimReal=real || (sits[i].cls==="st-envasado" ? fe+DIA_MS : 0);
+        const fimVerde=fimReal ? Math.min(fimReal,fe+DIA_MS) : fe+DIA_MS;
+        bars+=barra(b,fimVerde,"ready",`Envase ${Math.ceil(t.lead)}d`);
+        const fimVerm=fimReal ? fimReal : (sits[i].cls==="st-atraso" ? hoje+DIA_MS : 0);
+        if(fimVerm>fe+DIA_MS){
+          const n=Math.round((fimVerm-fe-DIA_MS)/DIA_MS);
+          const x0=Math.max(fe+DIA_MS,ini0), x1=Math.min(fimVerm,fimJ);
+          if(x1>x0){
+            const first=Math.round((x0-fe)/DIA_MS), cnt=Math.round((x1-x0)/DIA_MS);
+            const nums=[...Array(cnt)].map((_,k)=>`<span>${first+k}</span>`).join("");
+            bars+=`<div class="gt-bar atraso" style="left:${(x0-ini0)/(nd*DIA_MS)*100}%;width:${(x1-x0)/(nd*DIA_MS)*100}%" title="${n} dia(s) de atraso no envase">${nums}</div>`;
+          }
+        }
+      } else {
+        const fimPronto=real ? real : Math.max(hoje+DIA_MS,b+DIA_MS);
+        if(!real || real>b) bars+=barra(b,fimPronto,"ready",(fimPronto-b)>2*DIA_MS?"Pronto p/ envase":"✓");
+      }
     }
     h+=`<div class="gt-bars" style="grid-row:${row}">${bars}</div>`;
   });
@@ -1252,13 +1348,11 @@ function renderGantt(lista){
 function abrirTanque(i){
   const t=cerejaTanques[i]; if(!t) return;
   const s=cjSituacao(t);
-  const opMap=new Map((typeof data!=="undefined"?data:[]).map(r=>[String(r.op),r]));
   const linhas=t.itens.map(it=>{
-    const r=opMap.get(String(it.op));
-    const st=r&&r.status ? `<span class="tag ${tagClass(r.status)}">${cjEsc(r.status)}</span>` : "";
-    return `<tr><td>${cjEsc(it.op)||"—"}</td><td>${cjEsc(it.produto)}</td><td>${cjEsc(it.und)}</td><td class="n">${cjKg(it.qtd)}</td><td class="n">${cjKg(it.kg)}</td><td>${st}</td></tr>`;
+    const st=it.statusOp ? `<span class="tag ${tagClass(it.statusOp)}">${cjEsc(it.statusOp)}</span>` : "";
+    return `<tr><td>${cjEsc(it.op)||"—"}</td><td>${cjEsc(it.produto)}</td><td>${cjEsc(it.und)}</td><td class="n">${cjKg(it.qtd)}</td><td class="n">${cjKg(it.apontN)}</td><td class="n">${cjKg(it.kg)}</td><td class="n"><b>${cjKg(it.kgEnvN)}</b></td><td class="n">${it.leadN?cjKg(it.leadN)+" d":"—"}</td><td>${st}</td></tr>`;
   }).join("");
-  const diasTxt=s.dias===undefined ? "—" : (s.dias>0 ? `${s.dias} dia(s)` : (s.dias===0?"Hoje":`Pronto há ${-s.dias} dia(s)`));
+  const diasTxt=s.cls==="st-prep" ? `${s.dias} dia(s)` : (s.cls==="st-aguard"||s.cls==="st-livre" ? "—" : "Pronto");
   document.getElementById("cjCard").innerHTML=`
     <div class="cm-top">
       ${tanqueSvg(t,s,100+i,false)}
@@ -1270,21 +1364,23 @@ function abrirTanque(i){
         <div class="cm-f"><span>Tipo</span><b>${cjEsc(t.tipo)||"—"}</b></div>
         <div class="cm-f"><span>Categoria</span><b>${cjEsc(t.categoria)||"—"}</b></div>
         <div class="cm-f"><span>Grupo de envase</span><b>${cjEsc(t.grupo)||"—"}</b></div>
-        <div class="cm-f"><span>Dias p/ envase</span><b>${diasTxt}</b></div>
+        <div class="cm-f"><span>Dias p/ ficar pronto</span><b>${diasTxt}</b></div>
         <div class="cm-f"><span>Início do preparo</span><b>${cjDataLonga(t.inicio)}</b></div>
-        <div class="cm-f"><span>Envase previsto</span><b>${cjDataLonga(t.envase)}</b></div>
-        <div class="cm-f"><span>Envase real</span><b>${cjDataLonga(t.envaseReal)}</b></div>
-        <div class="cm-f"><span>Fim da ocupação</span><b>${cjDataLonga(t.fim)}</b></div>
-        <div class="cm-f"><span>Capacidade</span><b>${cjKg(t.capac)} kg</b></div>
-        <div class="cm-f"><span>Kg útil</span><b>${cjKg(t.util)} kg</b></div>
+        <div class="cm-f"><span>Pronto p/ envase</span><b>${cjDataLonga(t.envase)}</b></div>
+        <div class="cm-f"><span>Lead time de envase</span><b>${t.lead?cjKg(t.lead)+" dia(s)":"—"}</b></div>
+        <div class="cm-f"><span>Fim do envase previsto</span><b>${t.fimEnvN?new Date(t.fimEnvN).toLocaleDateString("pt-BR"):"—"}</b></div>
+        <div class="cm-f"><span>Fim do envase (real)</span><b>${cjDataLonga(t.envaseReal)}</b></div>
+        <div class="cm-f ${s.cls==="st-atraso"?"cm-atraso":""}"><span>Atraso no envase</span><b>${s.cls==="st-atraso"?s.atraso+" dia(s)":"—"}</b></div>
+        <div class="cm-f"><span>Capacidade / Kg útil</span><b>${cjKg(t.capac)} / ${cjKg(t.util)} kg</b></div>
         <div class="cm-f"><span>Programado</span><b>${cjKg(t.usado)} kg (${Math.round(t.pctOcup*100)}%)</b></div>
-        <div class="cm-f"><span>Restante</span><b style="color:${t.restante<=0?"#b40000":"#0b6548"}">${cjKg(t.restante)} kg (${Math.round(t.pctRest*100)}%)</b></div>
+        <div class="cm-f"><span>Kg envasado</span><b>${cjKg(t.envasado)} kg</b></div>
+        <div class="cm-f"><span>Saldo no tanque</span><b style="color:${t.saldo<=0?"#b40000":"#0b6548"}">${cjKg(t.saldo)} kg (${Math.round(t.pctSaldo*100)}%)</b></div>
       </div>
       ${t.obs?`<div class="cm-f" style="margin-bottom:12px"><span>Observações</span><b style="font-size:13px">${cjEsc(t.obs)}</b></div>`:""}
-      <div class="panel-title" style="margin-bottom:6px">Itens programados</div>
-      ${t.itens.length ? `<table class="cm-items"><thead><tr><th>NR OP</th><th>Produto</th><th>Und</th><th class="n">Qtd</th><th class="n">Kg</th><th>Status OP</th></tr></thead>
+      <div class="panel-title" style="margin-bottom:6px">Itens programados × envasado</div>
+      ${t.itens.length ? `<div class="cm-scroll"><table class="cm-items"><thead><tr><th>NR OP</th><th>Produto</th><th>Und</th><th class="n">Qtd prog.</th><th class="n">Apontado</th><th class="n">Kg prog.</th><th class="n">Kg envasado</th><th class="n">Lead</th><th>Status OP</th></tr></thead>
         <tbody>${linhas}</tbody>
-        <tfoot><tr><td colspan="3">Total</td><td class="n">${cjKg(t.itens.reduce((a,x)=>a+x.qtd,0))}</td><td class="n">${cjKg(t.usado)}</td><td></td></tr></tfoot></table>`
+        <tfoot><tr><td colspan="3">Total</td><td class="n">${cjKg(t.itens.reduce((a,x)=>a+x.qtd,0))}</td><td class="n">${cjKg(t.itens.reduce((a,x)=>a+x.apontN,0))}</td><td class="n">${cjKg(t.usado)}</td><td class="n">${cjKg(t.envasado)}</td><td></td><td></td></tr></tfoot></table></div>`
         : `<div class="cm-empty">Nenhum item programado neste tanque.</div>`}
     </div>`;
   const svg=document.querySelector("#cjCard .liq"); if(svg) svg.style.transform=`translateY(${svg.dataset.nivel}px)`;
