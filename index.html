@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V44</title>
+<title>Painel de Ordens de Produção - V45</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -368,7 +368,7 @@ body.smartphone.has-menu .app{margin-left:0}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V44 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
+        <span>V45 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -394,7 +394,7 @@ body.smartphone.has-menu .app{margin-left:0}
           <div class="gt-legend"><span><i style="background:#e07b00"></i>Preparo (início → pronto p/ envase)</span><span><i style="background:#17a259"></i>Envase (lead time da embalagem)</span><span><i style="background:#c00000"></i>Atraso no envase (nº = dia de atraso)</span><span><i style="background:var(--vermelho)"></i>Hoje</span></div></div>
         <div class="gt-scroll" id="cjGantt"></div>
       </div>
-      <div class="footer"><span>Preparo: Fatiada 7 dias, demais 15 dias • Envase: lead time por embalagem • Nível do tanque = saldo (kg útil − kg envasado)</span><span>V44 • Controle Cereja • Atualização automática 5 min</span></div>
+      <div class="footer"><span>Preparo: Fatiada 7 dias, demais 15 dias • Envase: lead time por embalagem • Nível do tanque = saldo (kg útil − kg envasado)</span><span>V45 • Controle Cereja • Atualização automática 5 min</span></div>
     </section>
 </div>
 <div class="cj-modal" id="cjModal"><div class="cj-card" id="cjCard"></div></div>
@@ -1103,6 +1103,8 @@ function cjRendimento(t){
   if(/com cabo/i.test(t.tipo)) return 0.84;
   return 0;  // Sem Cabo / Amarena: mantém o kg útil enviado pela planilha
 }
+// dia 1 do preparo = 0 (branco); último dia antes do envase = 1 (cor final)
+function cjProgCor(ini,env,hoje){const tot=Math.round((env-ini)/DIA_MS)-1; return tot<=0?1:Math.min(1,Math.max(0,Math.round((hoje-ini)/DIA_MS)/tot));}
 function cjHoje(){return dayNum(new Date());}
 
 function cerejaDeMatriz(matriz){
@@ -1180,8 +1182,8 @@ function cjSituacao(t){
   const nivel=t.pctSaldo;
   const dias=Math.round((env-hoje)/DIA_MS);
   if(hoje<ini){const n=Math.round((ini-hoje)/DIA_MS); return {cls:"st-aguard",txt:"Aguardando início",cont:`${n} <small>${n===1?"DIA":"DIAS"} P/ INICIAR</small>`,sub:"",dias,cor:"#1266d6",nivel};}
-  if(dias>0) return {cls:"st-prep",txt:"Em preparo",cont:`${dias} <small>${dias===1?"DIA":"DIAS"} P/ ENVASE</small>`,sub:"",dias,cor:"#f0a020",nivel,
-    prog:Math.min(1,Math.max(0,(hoje-ini)/(env-ini)))};
+  if(dias>0) return {cls:"st-prep",txt:"Em preparo",cont:`${dias} <small>${dias===1?"DIA":"DIAS"} P/ ENVASE</small>`,sub:`dia ${Math.round((hoje-ini)/DIA_MS)+1} de ${Math.round((env-ini)/DIA_MS)} · cor ${Math.round(cjProgCor(ini,env,hoje)*100)}%`,dias,cor:"#f0a020",nivel,
+    prog:cjProgCor(ini,env,hoje)};
   if(!fimEnv) return {cls:"st-pronto",txt:"Pronto p/ envase",cont:dias===0?"PRONTO HOJE":"PRONTO",sub:dias<0?`há ${-dias} ${-dias===1?"dia":"dias"}`:"",dias,cor:"#17a259",nivel};
   if(hoje<=fimEnv){
     const k=Math.round((hoje-env)/DIA_MS)+1;
@@ -1196,8 +1198,65 @@ function cjSituacao(t){
 const TK_BODY="M32,62 L32,178 Q32,186 38,191 L70,214 Q74,217 80,217 Q86,217 90,214 L122,191 Q128,186 128,178 L128,62 Z";
 const TK_TOP=214, TK_FULL=68;
 function cjWave(y){let d=`M-80,${y} q20,-5 40,0`; for(let i=0;i<9;i++) d+=" t40,0"; return d+" L320,260 L-80,260 Z";}
+// Cor do líquido: começa transparente (calda/água) e avermelha durante o preparo até o dia do envase.
+// Cereja comum termina vermelha; Amarena termina roxa.
+const CJ_COR_INI=["#f4f9fb","#dfeef3","#b9d3dc"];
+const CJ_COR_VERM=["#f0405a","#d0142f","#7c0a1f"];
+const CJ_COR_ROXA=["#a04a9c","#6a1c6e","#2c0636"];
+// Fruta: começa branquinha e termina vermelho cereja (ou roxa na Amarena)
+const CJ_FRUTA_INI=["#fffdf5","#f3ead2","#d9cba6"];
+const CJ_FRUTA_VERM=["#ff6b7f","#c8102e","#6e0717"];
+const CJ_FRUTA_ROXA=["#b065ad","#5b1a5e","#24052a"];
+function cjRnd(seed){let x=Math.sin(seed*9301+49297)*233280; return x-Math.floor(x);}
+// Desenha as cerejas dentro do líquido (coordenadas a partir da superfície). tipo: cabo | semcabo | fatiada
+function cjFrutas(t,idx,prof){
+  if(prof<10) return "";
+  const tipo=/fatiad|picad|peda/i.test(t.tipo)?"fatiada":(/com cabo/i.test(t.tipo)?"cabo":"semcabo");
+  const gid=`tkFr${idx}`, out=[];
+  const passoX=tipo==="fatiada"?13:13, passoY=tipo==="fatiada"?10.5:11.5;
+  let n=0;
+  for(let y=7; y<prof+4; y+=passoY){
+    const linha=Math.round(y/passoY);
+    for(let x=36+(linha%2?passoX/2:0); x<126; x+=passoX){
+      n++;
+      const jx=x+(cjRnd(idx*131+n)-.5)*5, jy=y+(cjRnd(idx*71+n*3)-.5)*4, rot=Math.round(cjRnd(idx*17+n*7)*360);
+      if(tipo==="fatiada"){
+        const w=4.8+cjRnd(n*5+idx)*1.4;
+        out.push(`<path transform="translate(${jx.toFixed(1)},${jy.toFixed(1)}) rotate(${rot})" d="M${-w},0 A${w},${w*.85} 0 0 1 ${w},0 Q0,${w*.35} ${-w},0 Z" fill="url(#${gid})" stroke="rgba(60,0,10,.18)" stroke-width=".5"/>`);
+      }else{
+        const r=4.6+cjRnd(n*3+idx)*.8;
+        let c=`<g transform="translate(${jx.toFixed(1)},${jy.toFixed(1)})"><circle r="${r.toFixed(1)}" fill="url(#${gid})"/><ellipse cx="${(-r*.35).toFixed(1)}" cy="${(-r*.4).toFixed(1)}" rx="${(r*.32).toFixed(1)}" ry="${(r*.2).toFixed(1)}" fill="rgba(255,255,255,.55)"/>`;
+        if(tipo==="cabo" && cjRnd(n*13+idx)<.6){const a=(cjRnd(n*11+idx)-.5)*80; c+=`<path transform="rotate(${a.toFixed(0)})" d="M0,${(-r+.8).toFixed(1)} q1.5,-3.5 3.5,-6.5" fill="none" stroke="#7d8f3c" stroke-width=".9" stroke-linecap="round"/>`;}
+        out.push(c+"</g>");
+      }
+    }
+  }
+  return out.join("");
+}
+function cjMix(a,b,p){const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16)); const A=h(a),B=h(b); return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*p).toString(16).padStart(2,"0")).join("");}
+function cjCorProg(sit){
+  if(sit.cls==="st-prep") return Math.min(1,Math.max(0,sit.prog??0));
+  if(sit.cls==="st-aguard"||sit.cls==="st-livre") return 0;
+  return 1;
+}
 function tanqueSvg(t,sit,idx,animar){
   const amarena=/amarena/i.test(t.tipo);
+  const cp=cjCorProg(sit), fim=amarena?CJ_COR_ROXA:CJ_COR_VERM;
+  const cores=CJ_COR_INI.map((c,k)=>cjMix(c,fim[k],Math.pow(cp,0.85)));
+  const gid=`tkLiq${idx}`;
+  const anim=(k)=>animar&&cp>0 ? `<animate attributeName="stop-color" from="${CJ_COR_INI[k]}" to="${cores[k]}" dur="2.4s" begin="${.3+idx*.08}s" fill="freeze"/>` : "";
+  const grad=`<defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="${animar&&cp>0?CJ_COR_INI[0]:cores[0]}">${anim(0)}</stop>
+      <stop offset=".25" stop-color="${animar&&cp>0?CJ_COR_INI[1]:cores[1]}">${anim(1)}</stop>
+      <stop offset="1" stop-color="${animar&&cp>0?CJ_COR_INI[2]:cores[2]}">${anim(2)}</stop></linearGradient></defs>`;
+  const escuro=cp>0.45;
+  const fim2=amarena?CJ_FRUTA_ROXA:CJ_FRUTA_VERM;
+  const fr=CJ_FRUTA_INI.map((c,k)=>cjMix(c,fim2[k],Math.pow(cp,0.8)));
+  const animF=(k)=>animar&&cp>0 ? `<animate attributeName="stop-color" from="${CJ_FRUTA_INI[k]}" to="${fr[k]}" dur="2.4s" begin="${.3+idx*.08}s" fill="freeze"/>` : "";
+  const gradF=`<defs><radialGradient id="tkFr${idx}" cx=".38" cy=".35" r=".75">
+      <stop offset="0" stop-color="${animar&&cp>0?CJ_FRUTA_INI[0]:fr[0]}">${animF(0)}</stop>
+      <stop offset=".55" stop-color="${animar&&cp>0?CJ_FRUTA_INI[1]:fr[1]}">${animF(1)}</stop>
+      <stop offset="1" stop-color="${animar&&cp>0?CJ_FRUTA_INI[2]:fr[2]}">${animF(2)}</stop></radialGradient></defs>`;
   const pctN=sit.nivel??t.pctOcup;
   const nivel=TK_TOP-(TK_TOP-TK_FULL)*pctN;
   const prof=TK_TOP-nivel;
@@ -1210,13 +1269,15 @@ function tanqueSvg(t,sit,idx,animar){
   const kfBolha=bolhas ? `<style>@keyframes bubUp${idx}{0%{transform:translateY(0);opacity:0}15%{opacity:.8}100%{transform:translateY(-${Math.max(12,prof-14)}px);opacity:0}}</style>` : "";
   const liq=pctN>0 ? `
       <g class="liq" style="transform:translateY(${animar?TK_TOP:nivel}px)" data-nivel="${nivel}">
-        <path class="wave w2" d="${cjWave(2)}" fill="url(#${amarena?"tkLiqA":"tkLiqC"})"/>
-        <path class="wave" d="${cjWave(4)}" fill="url(#${amarena?"tkLiqA":"tkLiqC"})" opacity=".93"/>
+        <path class="wave w2" d="${cjWave(2)}" fill="url(#${gid})"/>
+        <path class="wave" d="${cjWave(4)}" fill="url(#${gid})" opacity=".93"/>
+        <g class="frutas">${cjFrutas(t,idx,TK_TOP-nivel)}</g>
+        <rect x="20" y="6" width="120" height="${Math.max(0,TK_TOP-nivel)}" fill="url(#${gid})" opacity=".22"/>
         ${bolhas}
       </g>` : "";
   const pct=pctN>0 ? Math.round(pctN*100)+"%" : "VAZIO";
   return `<svg class="tank-svg" viewBox="0 0 160 250" role="img" aria-label="${cjEsc(t.nome)}: ${pct} de saldo">
-    ${kfBolha}
+    ${kfBolha}${grad}${gradF}
     <ellipse cx="80" cy="243" rx="60" ry="6" fill="rgba(0,0,0,.16)"/>
     <rect x="77" y="186" width="6" height="52" rx="2" fill="#7d8a90"/>
     <rect x="40" y="182" width="7" height="58" rx="2" fill="url(#tkSteel)"/><rect x="113" y="182" width="7" height="58" rx="2" fill="url(#tkSteel)"/>
@@ -1237,7 +1298,7 @@ function tanqueSvg(t,sit,idx,animar){
     <circle class="${ativo||sit.cls==="st-pronto"||sit.cls==="st-atraso"?"lamp":""}" cx="112" cy="50" r="4.5" fill="${sit.cor}" stroke="#fff" stroke-width="1.2"/>
     <rect x="60" y="74" width="40" height="15" rx="3" fill="#0b3d2c" opacity=".92"/><text x="80" y="85" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff" font-family="Segoe UI,Arial">T-${num}</text>
     <text x="80" y="140" text-anchor="middle" font-size="${pctN>0?25:17}" font-weight="900" font-family="Segoe UI,Arial"
-      fill="${pctN>0.35?"#fff":"#36454b"}" stroke="${pctN>0.35?"rgba(60,0,10,.35)":"none"}" stroke-width="1">${pct}</text>
+      fill="${pctN>0.35&&escuro?"#fff":"#36454b"}" stroke="${pctN>0.35&&escuro?"rgba(60,0,10,.35)":"none"}" stroke-width="1">${pct}</text>
   </svg>`;
 }
 
