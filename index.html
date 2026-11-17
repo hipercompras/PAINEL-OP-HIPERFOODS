@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Painel de Ordens de Produção - V45</title>
+<title>Painel de Ordens de Produção - V46</title>
 <style>
 :root {
   --verde:#064d36; --verde2:#0b6548; --verde3:#eaf5ec; --amarelo:#ffb617;
@@ -368,7 +368,7 @@ body.smartphone.has-menu .app{margin-left:0}
       </div>
       <div class="footer">
         <span id="recordInfo"></span>
-        <span>V45 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
+        <span>V46 • Controle Cereja • Exportar Excel • Filtro por período e lote • Atualização automática 5 min</span>
       </div>
     </main>
   </div>
@@ -394,7 +394,7 @@ body.smartphone.has-menu .app{margin-left:0}
           <div class="gt-legend"><span><i style="background:#e07b00"></i>Preparo (início → pronto p/ envase)</span><span><i style="background:#17a259"></i>Envase (lead time da embalagem)</span><span><i style="background:#c00000"></i>Atraso no envase (nº = dia de atraso)</span><span><i style="background:var(--vermelho)"></i>Hoje</span></div></div>
         <div class="gt-scroll" id="cjGantt"></div>
       </div>
-      <div class="footer"><span>Preparo: Fatiada 7 dias, demais 15 dias • Envase: lead time por embalagem • Nível do tanque = saldo (kg útil − kg envasado)</span><span>V45 • Controle Cereja • Atualização automática 5 min</span></div>
+      <div class="footer"><span>Preparo: Fatiada 7 dias, demais 15 dias • Envase: lead time por embalagem • Nível do tanque = saldo (kg útil − kg envasado)</span><span>V46 • Controle Cereja • Atualização automática 5 min</span></div>
     </section>
 </div>
 <div class="cj-modal" id="cjModal"><div class="cj-card" id="cjCard"></div></div>
@@ -895,45 +895,70 @@ function matrizParaObjetos(matriz){
   });
 }
 
-function reloadSharedBase(){
+const TENTATIVA_ESPERA_MS = 20 * 1000;   // nova tentativa 20 s depois de uma falha
+const TENTATIVA_MAX = 3;                 // até 3 novas tentativas por ciclo
+const JSONP_TIMEOUT_MS = 45 * 1000;      // sem resposta em 45 s = falha
+let baseRetryTimer=null, baseEmAndamento=false;
+
+function reloadSharedBase(tentativa){
+  tentativa = (typeof tentativa==="number") ? tentativa : 0;
+  if(tentativa===0){ clearTimeout(baseRetryTimer); baseRetryTimer=null; }
   const old=document.getElementById("appsScriptDynamic");
   if(old) old.remove();
 
-  const callbackName = "__hiperfoodsBaseCallback";
+  const callbackName = "__hiperfoodsBaseCallback_" + Date.now();
+  let encerrado=false, watchdog=null;
+  const conn=document.getElementById("connection"), txt=document.getElementById("connText");
+  const encerrar=()=>{
+    encerrado=true; clearTimeout(watchdog); baseEmAndamento=false;
+    const tag=document.getElementById("appsScriptDynamic"); if(tag && tag.dataset.cb===callbackName) tag.remove();
+    setTimeout(()=>{ try { delete window[callbackName]; } catch(e) {} }, 60000);
+  };
+  const falhou=(motivo)=>{
+    if(encerrado) return;
+    console.warn("Falha ao atualizar BASE_OP (tentativa "+(tentativa+1)+"):", motivo);
+    encerrar();
+    window[callbackName]=function(){};
+    if(!data.length) setData(FALLBACK_DATA,"Base carregada");
+    if(tentativa < TENTATIVA_MAX){
+      conn.classList.add("offline");
+      txt.textContent="Falha, tentando de novo...";
+      baseRetryTimer=setTimeout(()=>reloadSharedBase(tentativa+1), TENTATIVA_ESPERA_MS);
+    } else {
+      conn.classList.add("offline");
+      txt.textContent="Falha na atualização";
+    }
+  };
+
   window[callbackName] = function(matriz){
+    if(encerrado) return;
     try {
       const objetos = matrizParaObjetos(matriz);
+      if(!objetos.length) throw new Error("resposta vazia");
       const agora = new Date().toLocaleString("pt-BR", {
         day:"2-digit", month:"2-digit", year:"numeric",
         hour:"2-digit", minute:"2-digit", second:"2-digit"
       });
       setData(objetos, "Atualizado " + agora);
-      document.getElementById("connection").classList.remove("offline");
-      document.getElementById("connText").textContent="Online";
+      encerrar();
+      conn.classList.remove("offline");
+      txt.textContent="Online";
     } catch(err) {
       console.error("Erro ao processar BASE_OP:", err);
-      document.getElementById("connection").classList.add("offline");
-      document.getElementById("connText").textContent="Falha na atualização";
-    } finally {
-      const tag=document.getElementById("appsScriptDynamic");
-      if(tag) tag.remove();
-      try { delete window[callbackName]; } catch(e) {}
+      falhou(err);
     }
   };
 
+  baseEmAndamento=true;
+  if(tentativa>0) txt.textContent="Tentando de novo ("+tentativa+"/"+TENTATIVA_MAX+")...";
   const s=document.createElement("script");
   s.id="appsScriptDynamic";
+  s.dataset.cb=callbackName;
   s.src=APPS_SCRIPT_URL
       + "?callback=" + encodeURIComponent(callbackName)
       + "&t=" + Date.now();
-
-  s.onerror=()=>{
-    document.getElementById("connection").classList.add("offline");
-    document.getElementById("connText").textContent="Falha na atualização";
-    if(!data.length) setData(FALLBACK_DATA,"Base carregada");
-    try { delete window[callbackName]; } catch(e) {}
-  };
-
+  s.onerror=()=>falhou("erro de rede / script");
+  watchdog=setTimeout(()=>falhou("sem resposta em "+(JSONP_TIMEOUT_MS/1000)+" s"), JSONP_TIMEOUT_MS);
   document.head.appendChild(s);
 }
 
@@ -1470,21 +1495,39 @@ function setCereja(matriz,fonte){
   return true;
 }
 
-function reloadCereja(){
-  const cb="__cerejaCallback";
+let cerejaRetryTimer=null;
+function reloadCereja(tentativa){
+  tentativa = (typeof tentativa==="number") ? tentativa : 0;
+  if(tentativa===0){ clearTimeout(cerejaRetryTimer); cerejaRetryTimer=null; }
+  const cb="__cerejaCallback_"+Date.now();
   const old=document.getElementById("cerejaDynamic"); if(old) old.remove();
+  let encerrado=false, watchdog=null;
+  const encerrar=()=>{
+    encerrado=true; clearTimeout(watchdog);
+    const tag=document.getElementById("cerejaDynamic"); if(tag && tag.dataset.cb===cb) tag.remove();
+    setTimeout(()=>{ try{delete window[cb];}catch(e){} }, 60000);
+  };
+  const falhou=(motivo)=>{
+    if(encerrado) return;
+    console.warn("Falha ao atualizar CEREJA (tentativa "+(tentativa+1)+"):", motivo);
+    encerrar(); window[cb]=function(){};
+    if(!cerejaTanques.length) setCereja(FALLBACK_CEREJA,CEREJA_REF_TXT);
+    if(tentativa < TENTATIVA_MAX) cerejaRetryTimer=setTimeout(()=>reloadCereja(tentativa+1), TENTATIVA_ESPERA_MS);
+  };
   window[cb]=function(matriz){
+    if(encerrado) return;
     try{
       const agora=new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
-      if(!setCereja(matriz,"Atualizado "+agora+" • fonte: Gestão_Produção (Controle_Cereja + Plano_Cereja)") && !cerejaTanques.length)
-        setCereja(FALLBACK_CEREJA,CEREJA_REF_TXT);
-    }catch(err){console.error("Erro ao processar CEREJA:",err);}
-    finally{const tag=document.getElementById("cerejaDynamic"); if(tag) tag.remove(); try{delete window[cb];}catch(e){}}
+      if(setCereja(matriz,"Atualizado "+agora+" • fonte: Gestão_Produção (Controle_Cereja + Plano_Cereja)")) encerrar();
+      else falhou("resposta sem tanques");
+    }catch(err){console.error("Erro ao processar CEREJA:",err); falhou(err);}
   };
   const s=document.createElement("script");
   s.id="cerejaDynamic";
+  s.dataset.cb=cb;
   s.src=APPS_SCRIPT_URL+"?aba=CEREJA&callback="+encodeURIComponent(cb)+"&t="+Date.now();
-  s.onerror=()=>{ if(!cerejaTanques.length) setCereja(FALLBACK_CEREJA,CEREJA_REF_TXT); try{delete window[cb];}catch(e){} };
+  s.onerror=()=>falhou("erro de rede / script");
+  watchdog=setTimeout(()=>falhou("sem resposta"), JSONP_TIMEOUT_MS);
   document.head.appendChild(s);
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape") fecharTanque();});
